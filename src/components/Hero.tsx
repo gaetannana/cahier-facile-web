@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles, Brain, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-learning.jpg";
 
 export const Hero = () => {
@@ -40,11 +41,21 @@ export const Hero = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
-            <Button variant="hero" size="lg" className="group">
-              Commencer Gratuitement
-              <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-            </Button>
-            <Button variant="outline" size="lg">
+            <Link to="/signup" className="group">
+              <Button variant="hero" size="lg" className="group">
+                Commencer Gratuitement
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
+
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                const el = document.getElementById("how-it-works");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
               Découvrir Comment Ça Marche
             </Button>
           </div>

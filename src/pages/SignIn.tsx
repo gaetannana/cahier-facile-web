@@ -30,6 +30,11 @@ const SignIn: React.FC = () => {
           <CardDescription>Connectez-vous pour accéder à votre tableau de bord.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <Link to="/" className="text-sm text-muted-foreground hover:text-foreground underline">
+              ← Accueil
+            </Link>
+          </div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium">Email</label>
