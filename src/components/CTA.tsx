@@ -29,14 +29,35 @@ export const CTA = () => {
     const userId = idRef.current++;
     setMessages((m) => [...m, { id: userId, sender: "user", text }]);
 
-    // simulate AI typing and response
+    // call server proxy to get real AI reply
     setTyping(true);
-    setTimeout(() => {
-      const aiText = cannedResponses[messages.length % cannedResponses.length] || "Je peux vous aider à commencer.";
-      const aiId = idRef.current++;
-      setMessages((m) => [...m, { id: aiId, sender: "ai", text: aiText }]);
-      setTyping(false);
-    }, 900 + Math.random() * 700);
+    const API_URL = (import.meta.env.VITE_CHAT_API_URL as string) || "http://localhost:3001";
+
+    (async () => {
+      try {
+        const r = await fetch(`${API_URL}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+
+        if (!r.ok) {
+          throw new Error(`Bad response: ${r.status}`);
+        }
+
+        const body = await r.json();
+        const reply = body?.reply || cannedResponses[messages.length % cannedResponses.length] || "Je peux vous aider à commencer.";
+        const aiId = idRef.current++;
+        setMessages((m) => [...m, { id: aiId, sender: "ai", text: reply }]);
+      } catch (err) {
+        console.error("Chat proxy error", err);
+        const aiId = idRef.current++;
+        const fallback = cannedResponses[messages.length % cannedResponses.length] || "Je peux vous aider à commencer.";
+        setMessages((m) => [...m, { id: aiId, sender: "ai", text: fallback }]);
+      } finally {
+        setTyping(false);
+      }
+    })();
   };
   return (
     <section className="py-20 md:py-32">
@@ -83,8 +104,12 @@ export const CTA = () => {
                             >
                               <div
                                 className={`inline-block max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                                  m.sender === "user" ? "bg-accent/10 text-accent-foreground" : "bg-primary/10 text-primary-foreground"
+                                  m.sender === "user"
+                                    ? "bg-accent/10 text-accent-foreground"
+                                    : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
                                 }`}
+                                role={m.sender === "ai" ? "status" : undefined}
+                                aria-live={m.sender === "ai" ? "polite" : undefined}
                               >
                                 {m.text}
                               </div>
