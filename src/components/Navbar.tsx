@@ -33,7 +33,13 @@ export const Navbar = () => {
             <Link to="/about" className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors">
               À propos
             </Link>
-            <Button size="sm">Commencer</Button>
+            <Link to="/signin" className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors">
+              Se connecter
+            </Link>
+            <Link to="/signup">
+              <Button size="sm">S'inscrire</Button>
+            </Link>
+            <Button size="sm" variant="ghost">Commencer</Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -76,8 +82,14 @@ export const Navbar = () => {
             >
               À propos
             </Link>
-            <div className="px-4">
-              <Button className="w-full" size="sm">Commencer</Button>
+            <div className="px-4 space-y-2">
+              <Link to="/signin" onClick={() => setIsOpen(false)} className="block px-4 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent rounded-md transition-colors">
+                Se connecter
+              </Link>
+              <Link to="/signup" onClick={() => setIsOpen(false)} className="block">
+                <Button className="w-full" size="sm">S'inscrire</Button>
+              </Link>
+              <Button className="w-full" size="sm" variant="ghost">Commencer</Button>
             </div>
           </div>
         )}
