@@ -1,8 +1,43 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import aiBrain from "@/assets/ai-brain.png";
+import { useEffect, useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const CTA = () => {
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState<Array<{ id: number; sender: "user" | "ai"; text: string }>>([]);
+  const [typing, setTyping] = useState(false);
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const idRef = useRef(1);
+
+  const cannedResponses = [
+    "Super ! Parlez-moi de vos objectifs d'apprentissage.",
+    "Je peux vous proposer un parcours personnalisé en fonction de votre niveau.",
+    "Quels sont vos domaines préférés ? (ex: Data, Web, IA)",
+  ];
+
+  useEffect(() => {
+    // scroll to bottom when messages change
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    }
+  }, [messages, typing]);
+
+  const sendMessage = (text: string) => {
+    const userId = idRef.current++;
+    setMessages((m) => [...m, { id: userId, sender: "user", text }]);
+
+    // simulate AI typing and response
+    setTyping(true);
+    setTimeout(() => {
+      const aiText = cannedResponses[messages.length % cannedResponses.length] || "Je peux vous aider à commencer.";
+      const aiId = idRef.current++;
+      setMessages((m) => [...m, { id: aiId, sender: "ai", text: aiText }]);
+      setTyping(false);
+    }, 900 + Math.random() * 700);
+  };
   return (
     <section className="py-20 md:py-32">
       <div className="container mx-auto px-4">
@@ -17,15 +52,68 @@ export const CTA = () => {
                   Rejoignez des milliers d'apprenants qui ont amélioré leur taux de complétion 
                   de 30% grâce à notre plateforme IA.
                 </p>
-                <div className="flex flex-col gap-4 sm:flex-row">
-                  <Button variant="hero" size="lg" className="group">
+                <div className="flex flex-col gap-4 sm:flex-row items-start">
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    className="group"
+                    onClick={() => setChatOpen((v) => !v)}
+                  >
                     Commencer Maintenant
                     <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </Button>
-                  <Button variant="outline" size="lg">
-                    Voir une Démo
-                  </Button>
+                  {/* 'Voir une Démo' retiré volontairement */}
                 </div>
+                {/* Chat box */}
+                {chatOpen && (
+                  <div className="mt-6 max-w-xl">
+                    <Card>
+                      <CardContent>
+                        <div className="mb-2 flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">AI</div>
+                          <div className="text-sm font-medium">Assistant IA</div>
+                          <div className="ml-auto text-xs text-muted-foreground">En ligne</div>
+                        </div>
+
+                        <div ref={messagesRef} className="mb-3 max-h-48 overflow-y-auto space-y-2 px-1">
+                          {messages.map((m) => (
+                            <div
+                              key={m.id}
+                              className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
+                            >
+                              <div
+                                className={`inline-block max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                                  m.sender === "user" ? "bg-accent/10 text-accent-foreground" : "bg-primary/10 text-primary-foreground"
+                                }`}
+                              >
+                                {m.text}
+                              </div>
+                            </div>
+                          ))}
+                          {typing && (
+                            <div className="flex items-center">
+                              <div className="h-3 w-8 animate-pulse rounded-full bg-muted/60" />
+                            </div>
+                          )}
+                        </div>
+
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const fd = new FormData(e.currentTarget as HTMLFormElement);
+                            const text = (fd.get("message") as string) || "";
+                            if (text.trim()) sendMessage(text.trim());
+                            (e.currentTarget as HTMLFormElement).reset();
+                          }}
+                          className="flex gap-2"
+                        >
+                          <Input name="message" placeholder="Écrivez un message..." />
+                          <Button type="submit">Envoyer</Button>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
                 <div className="mt-8 flex items-center gap-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     ✓ Gratuit pendant 14 jours
