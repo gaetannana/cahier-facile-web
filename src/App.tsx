@@ -10,6 +10,9 @@ import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import ChatWidget from "./components/ChatWidget";
+import CartWidget from "./components/CartWidget";
+import Checkout from "./pages/Checkout";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +21,8 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <ChatWidget />
+      <CartWidget />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -25,6 +30,7 @@ const App = () => (
           <Route path="/signup" element={<SignUp />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/courses" element={<Courses />} />
+          <Route path="/checkout" element={<Checkout />} />
           <Route path="/about" element={<About />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

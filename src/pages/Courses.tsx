@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Clock, Star, Users, Play } from "lucide-react";
-import { useState } from "react";
-
-const coursesData = [
+import { Search, Clock, Star, Users, Play } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { toast } from "@/components/ui/use-toast";
+const defaultCourses = [
   {
     id: 1,
     title: "Machine Learning Complete Bootcamp",
@@ -88,13 +88,189 @@ const coursesData = [
   },
 ];
 
+// Curated Unsplash images (free to use via Unsplash license) used as course thumbnails
+const unsplashImages = [
+  "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1505685296765-3a2736de412f?w=800&q=80&auto=format&fit=crop",
+];
+
 const Courses = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadingAggregator, setLoadingAggregator] = useState(false);
 
-  const filteredCourses = coursesData.filter((course) =>
-    course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    course.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [courses, setCourses] = useState(() => {
+    try {
+      const raw = localStorage.getItem("pocia_courses");
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      return defaultCourses;
+    } catch {
+      return defaultCourses;
+    }
+  });
+
+  const saveCourses = (next: any) => {
+    setCourses(next);
+    try {
+      localStorage.setItem("pocia_courses", JSON.stringify(next));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const filteredCourses = courses.filter((course: any) => {
+    const title = (course.title || "").toString().toLowerCase();
+    const category = (course.category || "").toString().toLowerCase();
+    const q = searchQuery.toLowerCase();
+    return title.includes(q) || category.includes(q);
+  });
+
+  // Removed manual reset and add-course UI per request.
+
+  const clearAll = () => {
+    // keep function for internal use if needed, but not exposed in UI
+    saveCourses(defaultCourses);
+  };
+
+  // Auto-load aggregator courses on mount and ensure at least 30 courses
+  useEffect(() => {
+    (async () => {
+      // try aggregator silently
+      await importFromAggregator(true);
+      // normalize images for existing courses, then ensure we have 30 courses locally
+      normalizeCourseImages();
+      ensureThirtyCourses(30);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const importFromAggregator = async (suppressToast = false) => {
+    try {
+      setLoadingAggregator(true);
+      const q = (searchQuery || "").trim();
+      const url = `/api/courses?source=aggregator&query=${encodeURIComponent(q)}`;
+      const r = await fetch(url);
+      const data = await r.json();
+      if (!r.ok) {
+        console.error("Aggregator error", data);
+        if (!suppressToast) toast({ title: "Erreur", description: (data && data.error) || "Échec de l'import depuis l'agrégateur" });
+        return;
+      }
+      const items = data.results || [];
+      if (!Array.isArray(items) || items.length === 0) {
+        if (!suppressToast) toast({ title: "Aucun résultat", description: "Aucun cours trouvé depuis l'agrégateur." });
+        return;
+      }
+
+      const normalized = items.map((c: any, idx: number) => ({
+        id: c.id || `agg-${Date.now()}-${idx}`,
+        title: c.title || c.name || "Untitled",
+        platform: c.platform || c.source || "Agrégateur",
+        instructor: c.instructor || c.provider || undefined,
+        rating: c.rating || undefined,
+        students: c.students || undefined,
+        duration: c.duration || undefined,
+        level: c.level || undefined,
+        category: c.category || undefined,
+        price: c.price || "Gratuit",
+        image: c.image || undefined,
+      }));
+
+      // Merge + dedupe by title|platform
+      const map = new Map();
+      courses.forEach((c: any) => map.set(`${(c.title||"")}|${(c.platform||"")}`, c));
+      normalized.forEach((c: any) => map.set(`${(c.title||"")}|${(c.platform||"")}`, c));
+      const merged = Array.from(map.values());
+      saveCourses(merged);
+      if (!suppressToast) toast({ title: "Import terminé", description: `+${normalized.length} cours ajoutés depuis l'agrégateur.` });
+    } catch (err) {
+      console.error("Import aggregator failed", err);
+      if (!suppressToast) toast({ title: "Erreur", description: String(err) });
+    } finally {
+      setLoadingAggregator(false);
+    }
+  };
+
+  // Ensure every course has an image; if missing, assign a seeded picsum image and persist
+  const normalizeCourseImages = () => {
+    try {
+      const current = Array.isArray(courses) ? courses : [];
+      let changed = false;
+      const mapped = current.map((c: any, idx: number) => {
+        if (c.image && typeof c.image === "string" && c.image.length > 0) return c;
+        changed = true;
+        // Prefer unsplash images when normalizing, using a seeded selection
+        const unsplash = unsplashImages[idx % unsplashImages.length];
+        const seed = encodeURIComponent(String(c.id || c.title || idx));
+        const fallback = `https://picsum.photos/seed/${seed}/400/250`;
+        return { ...c, image: unsplash || fallback };
+      });
+      if (changed) saveCourses(mapped);
+    } catch (e) {
+      console.error("Failed to normalize course images", e);
+    }
+  };
+
+  // Generate generic courses to reach `count` total courses if needed
+  const ensureThirtyCourses = (count: number) => {
+    try {
+      const current = Array.isArray(courses) ? courses : [];
+      const toAdd = Math.max(0, count - current.length);
+      if (toAdd <= 0) return;
+
+      const platforms = ["Coursera", "Udemy", "edX", "Class Central"];
+      const instructors = ["Dr. Martin", "Prof. Dupont", "Sophie Martin", "Alexandre Moreau", "Team Instructors"];
+      const categories = ["Informatique", "Data Science", "Développement Web", "Marketing", "Cloud", "Programmation"];
+      const levels = ["Débutant", "Intermédiaire", "Avancé"];
+
+      const generated: any[] = [];
+
+      // collect available images from current courses to reuse
+      const availableImages = current.map((c: any) => c?.image).filter(Boolean);
+
+      for (let i = 0; i < toAdd; i++) {
+        const idx = current.length + i + 1;
+        const platform = platforms[i % platforms.length];
+        const instructor = instructors[i % instructors.length];
+        const category = categories[i % categories.length];
+        const level = levels[i % levels.length];
+        const rating = +(3.8 + ((i % 20) * 0.06)).toFixed(1);
+        const students = 500 + (i * 120);
+
+        // Prefer reusing existing images; otherwise use curated Unsplash list, then picsum fallback
+        const reuseImage = availableImages.length > 0 ? availableImages[i % availableImages.length] : null;
+        const unsplash = unsplashImages[i % unsplashImages.length];
+        const imageUrl = reuseImage || unsplash || `https://picsum.photos/seed/gen-${idx}-${i}/400/250`;
+
+        generated.push({
+          id: `gen-${Date.now()}-${i}`,
+          title: `Cours Générique ${idx} - ${category}`,
+          platform,
+          instructor,
+          rating,
+          students,
+          duration: `${8 + (i % 40)}h`,
+          level,
+          category,
+          price: i % 3 === 0 ? "Gratuit" : `${(19.99 + (i % 5) * 5).toFixed(2)}€`,
+          image: imageUrl,
+        });
+      }
+
+      const next = [...generated, ...current];
+      saveCourses(next);
+    } catch (e) {
+      console.error("Failed to generate courses", e);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -111,7 +287,7 @@ const Courses = () => {
             </p>
           </div>
 
-          {/* Search & Filter */}
+          {/* Search, Filter & Actions */}
           <div className="mb-8 flex flex-col gap-4 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -122,10 +298,7 @@ const Courses = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filtres
-            </Button>
+              <div className="text-sm text-muted-foreground">Les cours sont chargés automatiquement.</div>
           </div>
 
           {/* Courses Grid */}
@@ -134,7 +307,7 @@ const Courses = () => {
               <Card key={course.id} className="group overflow-hidden transition-all hover:shadow-lg">
                 <div className="relative aspect-video overflow-hidden">
                   <img
-                    src={course.image}
+                    src={course.image || `https://picsum.photos/seed/${encodeURIComponent(String(course.id || course.title))}/400/250`}
                     alt={course.title}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
@@ -171,7 +344,17 @@ const Courses = () => {
                       <span>{course.duration}</span>
                     </div>
                   </div>
-                  <Button className="mt-4 w-full" variant="outline">
+                  <Button
+                    className="mt-4 w-full"
+                    variant="outline"
+                    onClick={() => {
+                      try {
+                        window.dispatchEvent(new CustomEvent("add-to-cart", { detail: course }));
+                      } catch (e) {
+                        console.error("add-to-cart dispatch failed", e);
+                      }
+                    }}
+                  >
                     Ajouter au Parcours
                   </Button>
                 </CardContent>
