@@ -29,6 +29,11 @@ app.get("/health", (req, res) => {
 const cache = new Map();
 const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 
+// Simple in-memory users for local dev (DO NOT use in production)
+const users = [
+  { id: '1', email: 'admin@gmail.com', password: 'admin', role: 'admin', name: 'Admin' },
+];
+
 // Helper to cache results
 function getCached(key) {
   const entry = cache.get(key);
@@ -296,6 +301,26 @@ app.post("/api/chat", async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Simple login endpoint for local development
+app.post('/api/login', (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'Missing email or password' });
+
+    const user = users.find(u => u.email === String(email).toLowerCase());
+    if (!user || user.password !== String(password)) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Return a simple fake token (no JWT dependency). Replace with real auth in production.
+    const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+    return res.json({ ok: true, user: { id: user.id, email: user.email, role: user.role, name: user.name }, token });
+  } catch (e) {
+    console.error('Login error', e);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 

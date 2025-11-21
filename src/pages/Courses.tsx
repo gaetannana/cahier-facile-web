@@ -199,6 +199,31 @@ const Courses = () => {
     }
   };
 
+  const openCourse = (course: any) => {
+    try {
+      const title = String(course?.title || "").trim();
+      const q = encodeURIComponent(title);
+
+      // allow explicit external url on the course object
+      if (course?.externalUrl && typeof course.externalUrl === "string" && course.externalUrl.length > 0) {
+        window.open(course.externalUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      const platform = String(course?.platform || "").toLowerCase();
+      let url = "";
+      if (platform.includes("coursera")) {
+        url = `https://www.coursera.org/search?query=${q}`;
+      } else {
+        // default: open a W3Schools search for the course title
+        url = `https://www.w3schools.com/search/?q=${q}`;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      console.error("openCourse failed", e);
+    }
+  };
+
   // Ensure every course has an image; if missing, assign a seeded picsum image and persist
   const normalizeCourseImages = () => {
     try {
@@ -314,7 +339,7 @@ const Courses = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100">
                     <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
                       <Badge className="bg-primary">{course.platform}</Badge>
-                      <Button size="sm" className="gap-2">
+                      <Button size="sm" className="gap-2" onClick={() => openCourse(course)} aria-label={`Voir ${course.title}`}>
                         <Play className="h-4 w-4" />
                         Voir
                       </Button>
@@ -326,7 +351,9 @@ const Courses = () => {
                     <Badge variant="outline">{course.level}</Badge>
                     <span className="text-sm font-semibold text-primary">{course.price}</span>
                   </div>
-                  <CardTitle className="line-clamp-2 text-lg">{course.title}</CardTitle>
+                  <CardTitle className="line-clamp-2 text-lg cursor-pointer" onClick={() => openCourse(course)}>
+                    {course.title}
+                  </CardTitle>
                   <p className="text-sm text-muted-foreground">{course.instructor}</p>
                 </CardHeader>
                 <CardContent>

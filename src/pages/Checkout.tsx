@@ -26,6 +26,7 @@ const Checkout = () => {
   const [showPaymentForm, setShowPaymentForm] = React.useState(false);
   const [processing, setProcessing] = React.useState(false);
   const [paymentInfo, setPaymentInfo] = React.useState({ name: "", number: "", expiry: "", cvc: "" });
+  const [paymentSuccess, setPaymentSuccess] = React.useState(false);
 
   const confirmPayment = async () => {
     // Basic client-side validation (simulation only)
@@ -44,12 +45,12 @@ const Checkout = () => {
       // Simulate network/payment processing delay
       await new Promise((res) => setTimeout(res, 1200));
 
-      // Payment simulated successful: clear cart
+      // Payment simulated successful: clear cart and show confirmation links
       localStorage.removeItem(CART_KEY);
       setItems([]);
       toast({ title: "Paiement effectué", description: `Merci ! Montant débité: ${total.toFixed(2)}€` });
-      // redirect to confirmation or dashboard
-      window.location.href = "/dashboard";
+      setShowPaymentForm(false);
+      setPaymentSuccess(true);
     } catch (e) {
       console.error(e);
       toast({ title: "Erreur", description: "Le paiement a échoué." });
@@ -107,6 +108,27 @@ const Checkout = () => {
                   <div className="flex gap-2">
                     <Button onClick={confirmPayment} disabled={processing}>Confirmer et Payer</Button>
                     <Button variant="ghost" onClick={() => setShowPaymentForm(false)} disabled={processing}>Annuler</Button>
+                  </div>
+                </div>
+              )}
+
+              {paymentSuccess && (
+                <div className="mt-6 p-4 border rounded bg-muted">
+                  <h3 className="font-semibold mb-2">Votre paiement est confirmé</h3>
+                  <p className="text-sm text-muted-foreground mb-3">Merci pour votre achat — voici des liens vers les plateformes de cours :</p>
+                  <ul className="list-none space-y-2">
+                    <li>
+                      <a className="text-primary hover:underline" href="https://www.coursera.org/" target="_blank" rel="noopener noreferrer">Coursera</a>
+                    </li>
+                    <li>
+                      <a className="text-primary hover:underline" href="https://www.edx.org/" target="_blank" rel="noopener noreferrer">edX</a>
+                    </li>
+                    <li>
+                      <a className="text-primary hover:underline" href="https://www.udemy.com/" target="_blank" rel="noopener noreferrer">Udemy</a>
+                    </li>
+                  </ul>
+                  <div className="mt-4">
+                    <Button onClick={() => { setPaymentSuccess(false); window.location.href = '/dashboard'; }}>Aller au tableau de bord</Button>
                   </div>
                 </div>
               )}
