@@ -126,6 +126,55 @@ const Courses = () => {
     }
   };
 
+  // Comments are stored in localStorage under `pocia_comments` as a map: { [courseId]: Comment[] }
+  // Comment: { id, name, text, rating, ts }
+  const COMMENTS_KEY = "pocia_comments";
+  const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>(() => {
+    try {
+      const raw = localStorage.getItem(COMMENTS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const saveCommentsMap = (next: Record<string, any[]>) => {
+    setCommentsMap(next);
+    try {
+      localStorage.setItem(COMMENTS_KEY, JSON.stringify(next));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const getCommentsFor = (courseId: any) => {
+    return commentsMap[String(courseId)] || [];
+  };
+
+  const addCommentFor = (courseId: any, comment: { name: string; text: string; rating: number }) => {
+    const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const next = { id, name: comment.name, text: comment.text, rating: comment.rating || 0, ts: Date.now() };
+    const key = String(courseId);
+    const arr = Array.isArray(commentsMap[key]) ? [...commentsMap[key], next] : [next];
+    const updated = { ...commentsMap, [key]: arr };
+    saveCommentsMap(updated);
+  };
+
+  const computeAverageRating = (course: any) => {
+    const courseBase = typeof course?.rating === "number" ? course.rating : (parseFloat(String(course?.rating || "0")) || 0);
+    const comments = getCommentsFor(course.id);
+    if (!comments || comments.length === 0) return courseBase || undefined;
+    const sum = comments.reduce((s: number, c: any) => s + (Number(c.rating) || 0), 0);
+    const avgComments = sum / comments.length;
+    // Give equal weight to course base and comments if base exists
+    if (courseBase && courseBase > 0) return Number(((courseBase + avgComments) / 2).toFixed(1));
+    return Number(avgComments.toFixed(1));
+  };
+
+  // Local UI state for open comment panels and form values
+  const [openCommentsFor, setOpenCommentsFor] = useState<string | null>(null);
+  const [commentForm, setCommentForm] = useState<{ name: string; text: string; rating: number }>({ name: "", text: "", rating: 5 });
+
   const filteredCourses = courses.filter((course: any) => {
     const title = (course.title || "").toString().toLowerCase();
     const category = (course.category || "").toString().toLowerCase();
@@ -198,6 +247,7 @@ const Courses = () => {
       setLoadingAggregator(false);
     }
   };
+
 
   const openCourse = (course: any) => {
     try {
@@ -360,7 +410,7 @@ const Courses = () => {
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-accent text-accent" />
-                      <span className="font-medium">{course.rating}</span>
+                      <span className="font-medium">{computeAverageRating(course) ?? course.rating}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
@@ -384,6 +434,73 @@ const Courses = () => {
                   >
                     Ajouter au Parcours
                   </Button>
+                  {/* Comments / Ratings toggle */}
+                  <div className="mt-3">
+                    <button
+                      className="text-sm text-muted-foreground hover:text-primary"
+                      onClick={() => {
+                        const id = String(course.id);
+                        setOpenCommentsFor(openCommentsFor === id ? null : id);
+                        if (openCommentsFor !== id) setCommentForm({ name: "", text: "", rating: 5 });
+                      }}
+                    >
+                      {getCommentsFor(course.id).length} commentaire(s)
+                    </button>
+
+                    {openCommentsFor === String(course.id) && (
+                      <div className="mt-3 border-t pt-3">
+                        <div className="space-y-2">
+                          {getCommentsFor(course.id).length === 0 && (
+                            <div className="text-sm text-muted-foreground">Pas encore de commentaires pour ce cours.</div>
+                          )}
+                          {getCommentsFor(course.id).map((c: any) => (
+                            <div key={c.id} className="bg-white/5 p-2 rounded">
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium">{c.name || 'Anonyme'}</div>
+                                <div className="text-sm text-muted-foreground">{new Date(c.ts).toLocaleString()}</div>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm mt-1">
+                                <Star className="h-4 w-4 fill-accent text-accent" />
+                                <span className="font-medium">{c.rating}</span>
+                              </div>
+                              <div className="text-sm mt-1">{c.text}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-3 grid gap-2">
+                          <input className="input input-sm p-2 border rounded" placeholder="Votre nom" value={commentForm.name} onChange={(e) => setCommentForm({...commentForm, name: e.target.value})} />
+                          <textarea className="input input-sm p-2 border rounded" placeholder="Votre commentaire" value={commentForm.text} onChange={(e) => setCommentForm({...commentForm, text: e.target.value})} />
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm">Note :</label>
+                            <select value={commentForm.rating} onChange={(e) => setCommentForm({...commentForm, rating: Number(e.target.value)})} className="p-1 border rounded text-sm">
+                              <option value={5}>5</option>
+                              <option value={4}>4</option>
+                              <option value={3}>3</option>
+                              <option value={2}>2</option>
+                              <option value={1}>1</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              className="px-3 py-1 bg-primary text-white rounded"
+                              onClick={() => {
+                                if (!commentForm.text || commentForm.text.trim().length < 2) {
+                                  try { toast({ title: 'Erreur', description: 'Le commentaire est trop court.' }); } catch {}
+                                  return;
+                                }
+                                addCommentFor(course.id, commentForm);
+                                setCommentForm({ name: '', text: '', rating: 5 });
+                              }}
+                            >
+                              Envoyer
+                            </button>
+                            <button className="px-3 py-1 border rounded" onClick={() => setOpenCommentsFor(null)}>Fermer</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
